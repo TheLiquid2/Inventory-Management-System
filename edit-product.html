@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="style.css" />
+
+    <title>Document</title>
+</head>
+
+<body onload="initEditProduct()">
+  <header class="topbar">
+    <nav>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="products.html" class="active">Products</a>
+      <a href="add-product.html">Add Product</a>
+      <a href="about.html">Help</a>
+    </nav>
+    <button onclick="logout()">Logout</button>
+  </header>
+
+  <main class="container">
+    <h1>Edit Product</h1>
+
+    <form id="productForm" onsubmit="handleSubmit(event)" style="display:none;">
+      <div class="grid" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:12px;">
+        <label>Product Name
+          <input id="name" required maxlength="80">
+        </label>
+
+        <label>SKU
+          <input id="sku" required maxlength="30">
+        </label>
+
+        <label>Price
+          <input id="price" type="number" min="0" step="0.01" required>
+        </label>
+
+        <label>Quantity
+          <input id="quantity" type="number" min="0" step="1" required>
+        </label>
+
+        <label>Category
+          <select id="category" required>
+            <option>Electronics</option>
+            <option>Furniture</option>
+            <option>Clothing</option>
+            <option>Food</option>
+            <option>Other</option>
+          </select>
+        </label>
+      </div>
+
+      <div id="error" class="hint" style="display:none; color:#b91c1c; margin:8px 0;"></div>
+      <div id="success" class="hint" style="display:none; color:#166534; margin:8px 0;"></div>
+
+      <div style="display:flex; gap:10px; margin-top:8px; flex-wrap:wrap;">
+        <button type="submit">Update Product</button>
+        <a class="btn" href="products.html" style="background:#6b7280;">Cancel</a>
+      </div>
+    </form>
+
+    <div id="notFound" class="card" style="padding:16px; display:none;">
+      <p class="hint" style="margin:0 0 12px; color:#b91c1c;">
+        Product not found or invalid ID.
+      </p>
+      <a class="btn" href="products.html">Back to Products</a>
+    </div>
+  </main>
+
+  <script src="auth.js"></script>
+  <script src="storage.js"></script>
+  <script src="settings.js"></script>
+  <script>
+
+    function fillCategories(selectId, selectedValue) {
+    const s = getSettings();
+    const sel = document.getElementById(selectId);
+    sel.innerHTML = '<option value="">Select a category</option>' +
+      (s.categories || []).map(c => `<option ${c===selectedValue?'selected':''}>${c}</option>`).join('');
+  }
+    let currentId = null;
+
+    function initEditProduct() {
+      requireAuth();
+
+      const params = new URLSearchParams(window.location.search);
+      const idParam = params.get('id');
+
+      if (!idParam) return showNotFound();
+
+      currentId = Number(idParam);
+      if (!Number.isFinite(currentId)) return showNotFound();
+
+      const product = findProduct(currentId);
+      if (!product) return showNotFound();
+
+     
+      document.getElementById('name').value = product.name || '';
+      document.getElementById('sku').value = product.sku || '';
+      document.getElementById('price').value = product.price ?? '';
+      document.getElementById('quantity').value = product.quantity ?? '';
+      document.getElementById('category').value = product.category || 'Other';
+
+      document.getElementById('productForm').style.display = 'block';
+    }
+
+    function showNotFound() {
+      document.getElementById('productForm').style.display = 'none';
+      document.getElementById('notFound').style.display = 'block';
+    }
+
+    function showError(msg) {
+      const el = document.getElementById('error');
+      el.textContent = msg;
+      el.style.display = 'block';
+      document.getElementById('success').style.display = 'none';
+    }
+
+    function showSuccess(msg) {
+      const el = document.getElementById('success');
+      el.textContent = msg;
+      el.style.display = 'block';
+      document.getElementById('error').style.display = 'none';
+    }
+
+    function handleSubmit(e) {
+      e.preventDefault();
+
+      const name = document.getElementById('name').value.trim();
+      const sku = document.getElementById('sku').value.trim();
+      const price = Number(document.getElementById('price').value);
+      const quantity = Number(document.getElementById('quantity').value);
+      const category = document.getElementById('category').value;
+
+      if (!name || !sku || !category) return showError('Please fill in all required fields.');
+      if (!isFinite(price) || price < 0) return showError('Price must be a valid number >= 0.');
+      if (!Number.isInteger(quantity) || quantity < 0) return showError('Quantity must be an integer >= 0.');
+
+      const updated = {
+        id: currentId,
+        name,
+        sku,
+        price,
+        quantity,
+        category,
+        dateAdded: (findProduct(currentId)?.dateAdded) || new Date().toISOString().slice(0,10)
+      };
+
+      updateProduct(updated);
+      showSuccess('Product updated successfully. Redirecting...');
+      setTimeout(() => { window.location.href = 'products.html'; }, 600);
+    }
+  </script>
+</body>
+<script src="auth.js"></script>
+<script>
+  requireAuth();
+</script>
+<script src="settings.js"></script>
+<script>
+  (function syncTitle(){
+    const s = getSettings();
+    document.title = s.appName + ' • ' + document.title.replace(/.*•\s*/, '');
+  })();
+</script>
+</html>

@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css" />
+    <title>Document</title>
+</head>
+
+
+<body onload="initDashboard()">
+  <header class="topbar">
+    <nav>
+      <a href="dashboard.html" >Dashboard</a>
+      <a href="products.html">Products</a>
+      <a href="add-product.html">Add Product</a>
+      <a href="about.html">Help</a>
+      <a href="settings.html" >Settings</a>
+      <a href="reports.html" >Reports</a>
+            <a href="po-list.html">POs</a>
+
+            <a href="vendors.html" >Vendors</a>
+
+    </nav>
+    <button onclick="logout()">Logout</button>
+  </header>
+
+  <main class="container">
+    <h1>Dashboard</h1>
+
+    <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:8px 0 16px;">
+      <button onclick="refreshStats()">Refresh Stats</button>
+      <button onclick="refreshAll()">Refresh All</button>
+      <a  href="products.html">Go to Products</a>
+      <a  href="add-product.html">+ Add Product</a>
+    </div>
+
+    <div class="row" style="display:flex; gap:12px; flex-wrap:wrap;">
+      <div class="card" style="flex:1; min-width:220px;">
+        <h3 style="margin:0 0 6px;">Total Products</h3>
+        <p id="statTotalProducts" style="font-size:28px; margin:0;">—</p>
+        <p class="hint" style="margin:4px 0 0;">Distinct products</p>
+      </div>
+
+      <div class="card" style="flex:1; min-width:220px;">
+        <h3 style="margin:0 0 6px;">Total Quantity</h3>
+        <p id="statTotalQty" style="font-size:28px; margin:0;">—</p>
+        <p class="hint" style="margin:4px 0 0;">Units across all products</p>
+      </div>
+
+      <div class="card" style="flex:1; min-width:220px;">
+        <h3 style="margin:0 0 6px;">Inventory Value</h3>
+        <p id="statInventoryValue" style="font-size:28px; margin:0;">—</p>
+        <p class="hint" style="margin:4px 0 0;">Sum </p>
+      </div>
+
+      <div class="card" style="flex:1; min-width:220px;">
+        <h3 style="margin:0 0 6px;">Low Stock Items</h3>
+        <p id="statLowStock" style="font-size:28px; margin:0;">—</p>
+        <p class="hint" style="margin:4px 0 0;">Qty ≤ 5</p>
+      </div>
+    </div>
+    <section class="card" style="margin-top:16px;">
+  <h3 style="margin-top:0;">Recent Activity</h3>
+  <p class="hint" style="margin:6px 0 12px;">Last 5 added/edited products</p>
+  <div id="recentList"></div>
+</section>
+
+<section class="card" style="margin-top:16px;">
+  <h3 style="margin-top:0;">Category Breakdown</h3>
+  <div id="categoryChart" style="margin-top:8px;"></div>
+</section>
+  </main>
+
+  <script src="auth.js"></script>
+  <script src="storage.js"></script>
+  <script src="utils.js"></script>
+  <script>
+    function initDashboard() {
+    requireAuth();
+    refreshStats();
+    renderRecent();
+    renderCategoryChart();
+  }
+
+  function refreshStats() {
+    const items = getProducts();
+    const totalProducts = items.length;
+
+    const totalQty = items.reduce((sum, p) => {
+      const qty = Number(p.quantity);
+      return sum + (isFinite(qty) ? qty : 0);
+    }, 0);
+
+    const inventoryValue = items.reduce((sum, p) => {
+      const price = Number(p.price);
+      const qty = Number(p.quantity);
+      const val = (isFinite(price) ? price : 0) * (isFinite(qty) ? qty : 0);
+      return sum + val;
+    }, 0);
+
+    const lowStock = items.filter(p => Number(p.quantity) <= 5).length;
+
+    document.getElementById('statTotalProducts').textContent = String(totalProducts);
+    document.getElementById('statTotalQty').textContent = String(totalQty);
+    document.getElementById('statInventoryValue').textContent = formatCurrency(inventoryValue);
+    document.getElementById('statLowStock').textContent = String(lowStock);
+  }
+
+  //recent Activity
+  function renderRecent() {
+    const box = document.getElementById('recentList');
+    const items = getProducts().map(p => ({
+      ...p,
+      _time: p.updatedAt || p.dateAdded || ''
+    }));
+
+    items.sort((a, b) => (a._time < b._time ? 1 : a._time > b._time ? -1 : 0)); // desc by time
+    const recent = items.slice(0, 5);
+
+    if (recent.length === 0) {
+      box.innerHTML = '<p class="hint">No recent activity yet.</p>';
+      return;
+    }
+
+    box.innerHTML = recent.map(p => `
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--line);">
+        <div>
+          <div style="font-weight:600;">${p.name} <span class="hint" style="font-weight:400;">(${p.sku})</span></div>
+          <div class="hint">Updated: ${formatDateTime(p.updatedAt || p.dateAdded)}</div>
+        </div>
+        <div style="text-align:right;">
+          <div>${formatCurrency(p.price)} • Qty: ${p.quantity}</div>
+          <a href="edit-product.html?id=${p.id}" class="hint">Edit</a>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  //category Breakdown mini-chart
+  function renderCategoryChart() {
+    const el = document.getElementById('categoryChart');
+    const items = getProducts();
+    const counts = getCategoryCounts(items);
+
+    if (Object.keys(counts).length === 0) {
+      el.innerHTML = '<p class="hint">No data yet.</p>';
+      return;
+    }
+
+    const max = Math.max(1, maxValue(counts));
+
+    //colors matching badges
+    const colorMap = {
+      Electronics: '#0ea5e9',
+      Furniture:   '#f59e0b',
+      Clothing:    '#ec4899',
+      Food:        '#10b981',
+      Other:       '#6b7280'
+    };
+
+    el.innerHTML = Object.keys(counts).sort().map(cat => {
+      const count = counts[cat];
+      const pct = Math.round((count / max) * 100);
+      const color = colorMap[cat] || colorMap.Other;
+      return `
+        <div style="margin:6px 0;">
+          <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+            <span>${cat}</span>
+            <span class="hint">${count}</span>
+          </div>
+          <div style="height:10px; background:#e5e7eb; border-radius:999px; overflow:hidden;">
+            <div style="width:${pct}%; height:100%; background:${color};"></div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function refreshAll() {
+    refreshStats();
+    renderRecent();
+    renderCategoryChart();
+  }
+  </script>
+</body>
+<script src="auth.js"></script>
+<script>
+  requireAuth();
+</script>
+<script src="settings.js"></script>
+<script>
+  (function syncTitle(){
+    const s = getSettings();
+    document.title = s.appName + ' • ' + document.title.replace(/.*•\s*/, '');
+  })();
+</script>
+</html>

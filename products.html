@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="style.css" />
+
+    <title>Document</title>
+</head>
+
+<body>
+<body onload="initProductsPage()">
+  <header class="topbar">
+    <nav>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="products.html" class="active">Products</a>
+      <a href="add-product.html">Add Product</a>
+      <a href="about.html">Help</a>
+    </nav>
+    <button onclick="logout()">Logout</button>
+  </header>
+
+  <main class="container">
+    <h1>Products</h1>
+
+    <div class="row" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+      <input id="search" placeholder="Search by name or SKU" oninput="renderProducts()" />
+      <select id="categoryFilter" onchange="renderProducts()">
+        <option value="">All Categories</option>
+        <option>Electronics</option>
+        <option>Furniture</option>
+        <option>Clothing</option>
+        <option>Food</option>
+        <option>Other</option>
+      </select>
+
+      <button onclick="seedAndReload()">Seed Demo Data</button> <button onclick="exportCSV()">Export CSV</button>
+      <a  href="add-product.html">+ New Product</a>
+    </div>
+
+    <table>
+  <thead>
+    <tr>
+      <th>SKU</th>
+      <th style="cursor:pointer" onclick="setSort('name')">Name ▲▼</th>
+      <th>Category</th>
+      <th style="cursor:pointer" onclick="setSort('price')">Price ▲▼</th>
+      <th style="cursor:pointer" onclick="setSort('quantity')">Qty ▲▼</th>
+      <th style="cursor:pointer" onclick="setSort('dateAdded')">Date ▲▼</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody id="tbody"></tbody>
+</table>
+
+    <p id="emptyState" class="hint" style="display:none; margin-top:12px;">
+      No products yet. Click “Seed Demo Data” or “+ New Product” to get started.
+    </p>
+  </main>
+
+  <script src="auth.js"></script>
+  <script src="storage.js"></script>
+  <script src="utils.js"></script>
+  <script src="settings.js"></script>
+
+  <script>
+  //sorting state
+  let sortKey = '';       
+  let sortDir = 'asc'; 
+
+  function initProductsPage() {
+    requireAuth();
+  populateCategoryFilter();
+  renderProducts();
+  }
+
+  function populateCategoryFilter() {
+  const s = getSettings();
+  const sel = document.getElementById('categoryFilter');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">All Categories</option>' +
+    (s.categories || []).map(c => `<option>${c}</option>`).join('');
+}
+
+  function seedAndReload() {
+    seedDemoProducts();
+    renderProducts();
+  }
+
+  function setSort(key) {
+    if (sortKey === key) {
+      //toggle direction
+      sortDir = (sortDir === 'asc') ? 'desc' : 'asc';
+    } else {
+      sortKey = key;
+      sortDir = 'asc';
+    }
+    renderProducts();
+  }
+
+  function catClass(cat) {
+    const c = (cat || 'Other').toLowerCase();
+    if (c === 'electronics') return 'electronics';
+    if (c === 'furniture')   return 'furniture';
+    if (c === 'clothing')    return 'clothing';
+    if (c === 'food')        return 'food';
+    return 'other';
+  }
+
+  function compare(a, b, key) {
+    const va = a?.[key];
+    const vb = b?.[key];
+
+    //numeric keys
+    if (key === 'price' || key === 'quantity') {
+      const na = Number(va);
+      const nb = Number(vb);
+      if (isFinite(na) && isFinite(nb)) return na - nb;
+      if (isFinite(na)) return -1;
+      if (isFinite(nb)) return 1;
+      return 0;
+    }
+
+   
+    if (key === 'dateAdded') {
+      const da = va || '';
+      const db = vb || '';
+      if (da < db) return -1;
+      if (da > db) return 1;
+      return 0;
+    }
+
+   
+    const sa = String(va ?? '').toLowerCase();
+    const sb = String(vb ?? '').toLowerCase();
+    if (sa < sb) return -1;
+    if (sa > sb) return 1;
+    return 0;
+  }
+
+  function getFilteredAndSorted() {
+    const products = getProducts();
+    const term = (document.getElementById('search')?.value || '').toLowerCase();
+    const cat = document.getElementById('categoryFilter')?.value || '';
+
+    let filtered = products.filter(p =>
+      (!cat || p.category === cat) &&
+      (
+        (p.name && p.name.toLowerCase().includes(term)) ||
+        (p.sku && p.sku.toLowerCase().includes(term))
+      )
+    );
+
+    if (sortKey) {
+      filtered.sort((a, b) => {
+        const res = compare(a, b, sortKey);
+        return sortDir === 'asc' ? res : -res;
+      });
+    }
+
+    return filtered;
+  }
+
+  function renderProducts() {
+    const s = getSettings();
+    const lowThreshold = Number(s.lowStockThreshold) ?? 5;
+    const filtered = getFilteredAndSorted();
+    const tbody = document.getElementById('tbody');
+    const empty = document.getElementById('emptyState');
+
+    if (!tbody || !empty) {
+      console.error('Missing tbody or emptyState element in products.html');
+      return;
+    }
+
+    if (filtered.length === 0) {
+      const hasAny = getProducts().length > 0;
+      empty.textContent = hasAny
+        ? 'No results. Try clearing the search term or changing the category.'
+        : 'No products yet. Click “Seed Demo Data” or “+ New Product” to get started.';
+      tbody.innerHTML = '';
+      empty.style.display = 'block';
+      return;
+    } else {
+      empty.style.display = 'none';
+    }
+
+    tbody.innerHTML = filtered.map(p => {
+      const badge = `<span class="badge ${catClass(p.category)}">${p.category || 'Other'}</span>`;
+      const qtyCell = Number(p.quantity) <= 5 ? `<span class="low">${p.quantity}</span>` : p.quantity;
+      const price = formatCurrency(p.price);
+      const date = formatDateISO(p.dateAdded);
+
+      return `
+        <tr>
+          <td>${p.sku}</td>
+          <td>${p.name}</td>
+          <td>${badge}</td>
+          <td>${price}</td>
+          <td>${qtyCell}</td>
+          <td>${date}</td>
+          <td>
+            <a href="edit-product.html?id=${p.id}">Edit</a>
+            <button onclick="handleDelete(${p.id})">Delete</button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+    const qtyCell = Number(p.quantity) <= lowThreshold
+    ? `<span class="low">${p.quantity}</span>`
+    : p.quantity;
+  }
+
+  function handleDelete(id) {
+    const p = findProduct(id);
+    const name = p ? p.name : 'this item';
+    const ok = confirm(`Delete "${name}" permanently?\nThis action cannot be undone.`);
+    if (!ok) return;
+
+    if (p) {
+      deleteProduct(id);
+      renderProducts();
+      showUndoToast(p);
+    } else {
+      deleteProduct(id);
+      renderProducts();
+    }
+  }
+
+  function showUndoToast(product) {
+    if (!product) return;
+
+    const toast = document.createElement('div');
+    toast.style.position = 'fixed';
+    toast.style.bottom = '16px';
+    toast.style.right = '16px';
+    toast.style.padding = '10px 14px';
+    toast.style.background = '#111827';
+    toast.style.color = '#fff';
+    toast.style.borderRadius = '8px';
+    toast.style.boxShadow = '0 8px 24px rgba(0,0,0,.2)';
+    toast.style.zIndex = '9999';
+    toast.style.display = 'flex';
+    toast.style.alignItems = 'center';
+
+    const text = document.createElement('span');
+    text.textContent = `Deleted "${product.name}". `;
+    toast.appendChild(text);
+
+    const undo = document.createElement('button');
+    undo.textContent = 'Undo';
+    undo.style.marginLeft = '8px';
+    undo.style.background = '#4f46e5';
+    undo.style.color = '#fff';
+    undo.style.border = 'none';
+    undo.style.padding = '6px 10px';
+    undo.style.borderRadius = '6px';
+    undo.style.cursor = 'pointer';
+
+    let undone = false;
+    undo.onclick = () => {
+      if (undone) return;
+      const items = getProducts();
+      items.push(product);
+      saveProducts(items);
+      renderProducts();
+      undone = true;
+      if (document.body.contains(toast)) document.body.removeChild(toast);
+    };
+
+    toast.appendChild(undo);
+    document.body.appendChild(toast);
+
+    setTimeout(() => {
+      if (document.body.contains(toast)) document.body.removeChild(toast);
+    }, 4000);
+  }
+
+  //export currently filtered view to CSV
+  function exportCSV() {
+    const rows = getFilteredAndSorted().map(p => ({
+      id: p.id,
+      name: p.name,
+      sku: p.sku,
+      category: p.category || '',
+      price: Number(p.price),
+      quantity: Number(p.quantity),
+      dateAdded: p.dateAdded || ''
+    }));
+
+    if (rows.length === 0) {
+      alert('There is no data to export.');
+      return;
+    }
+
+    const csv = toCSV(rows);
+    const filename = `products_${new Date().toISOString().slice(0,10)}.csv`;
+    downloadFile(filename, csv, 'text/csv');
+  }
+    
+  </script>
+</body>
+   
+    
+</body>
+<script src="auth.js"></script>
+<script>
+  requireAuth();
+</script>
+
+<script src="settings.js"></script>
+<script>
+  (function syncTitle(){
+    const s = getSettings();
+    document.title = s.appName + ' • ' + document.title.replace(/.*•\s*/, '');
+  })();
+</script>
+</html>
+
+

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Login | Inventory Management</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="center">
+  <div class="card">
+    <h1 style="margin:0 0 12px;">Inventory Management</h1>
+    <p class="hint" style="margin:0 0 16px;">Please sign in to continue</p>
+
+    <div class="field">
+      <label for="email">Email</label>
+      <input id="email" type="email" required />
+    </div>
+
+    <div class="field">
+      <label for="password">Password</label>
+      <input id="password" type="password" required />
+    </div>
+    
+    <p id="error" class="hint" style="display:none; color:#b91c1c;"></p>
+
+    <button id="loginBtn" style="width:100%; margin-top:6px;">Login</button>
+  </div>
+</body>
+<script src="auth.js"></script>
+<script>
+  const btn = document.getElementById('loginBtn');
+  btn.addEventListener('click', () => {
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    login(email, password);
+  });
+</script>
+
+<script src="settings.js"></script>
+<script>
+  // After requireAuth if present
+  (function syncTitle(){
+    const s = getSettings();
+    document.title = s.appName + ' • ' + document.title.replace(/.*•\s*/, '');
+  })();
+</script>
+</html>

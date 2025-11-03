@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Edit Vendor • IMS</title>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body onload="initEditVendor()">
+  <header class="topbar">
+    <nav>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="products.html">Products</a>
+      <a href="add-product.html">Add Product</a>
+      <a href="vendors.html">Vendors</a>
+      <a href="settings.html">Settings</a>
+      <a href="reports.html">Reports</a>
+      <a href="about.html">Help</a>
+    </nav>
+    <button class="btn btn-sm" onclick="logout()">Logout</button>
+  </header>
+
+  <main class="container">
+    <section class="card">
+      <h1 class="mt-0">Edit Vendor</h1>
+      <p id="formError" class="alert-error" style="display:none;" aria-live="assertive"></p>
+
+      <form onsubmit="return handleUpdate(event)">
+        <div class="grid">
+          <div class="field">
+            <label>Vendor Name</label>
+            <input id="name" required>
+          </div>
+          <div class="field">
+            <label>Contact Person</label>
+            <input id="contactName">
+          </div>
+          <div class="field">
+            <label>Email</label>
+            <input id="email" type="email">
+          </div>
+          <div class="field">
+            <label>Phone</label>
+            <input id="phone">
+          </div>
+          <div class="field" style="grid-column: 1/-1;">
+            <label>Address</label>
+            <input id="address">
+          </div>
+        </div>
+
+        <div class="row mt-12">
+          <button class="btn">Save Changes</button>
+          <a  href="vendors.html">Cancel</a>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <script src="auth.js"></script>
+  <script src="storage.js"></script>
+  <script>
+    let vendorId = null;
+
+    function initEditVendor() {
+      requireAuth();
+      const params = new URLSearchParams(location.search);
+      vendorId = Number(params.get('id'));
+      const v = findVendor(vendorId);
+      if (!v) {
+        alert('Vendor not found.'); location.href = 'vendors.html'; return;
+      }
+      document.getElementById('name').value = v.name || '';
+      document.getElementById('contactName').value = v.contactName || '';
+      document.getElementById('email').value = v.email || '';
+      document.getElementById('phone').value = v.phone || '';
+      document.getElementById('address').value = v.address || '';
+    }
+
+    function handleUpdate(e) {
+      e.preventDefault();
+      const data = {
+        id: vendorId,
+        name: document.getElementById('name').value.trim(),
+        contactName: document.getElementById('contactName').value.trim(),
+        email: document.getElementById('email').value.trim(),
+        phone: document.getElementById('phone').value.trim(),
+        address: document.getElementById('address').value.trim()
+      };
+      if (!data.name) return showError('Vendor name is required.');
+      if (data.email && !/^\S+@\S+\.\S+$/.test(data.email)) return showError('Please enter a valid email.');
+      if (data.phone && !/^[\d+()\-\s]{6,}$/.test(data.phone)) return showError('Please enter a valid phone number.');
+
+      updateVendor(data);
+      location.href = 'vendors.html';
+      return false;
+    }
+
+    function showError(msg) {
+      const el = document.getElementById('formError');
+      el.textContent = msg;
+      el.style.display = 'block';
+      setTimeout(() => el.style.display = 'none', 2000);
+    }
+  </script>
+</body>
+</html>

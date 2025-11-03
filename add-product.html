@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="style.css" />
+
+    <title>Document</title>
+</head>
+
+<body onload="initAddProduct()">
+  <header class="topbar">
+    <nav>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="products.html">Products</a>
+      <a href="add-product.html" class="active">Add Product</a>
+      <a href="about.html">Help</a>
+    </nav>
+    <button onclick="logout()">Logout</button>
+  </header>
+
+  <main class="container">
+    <h1>Add Product</h1>
+
+    <form id="productForm" onsubmit="handleSubmit(event)">
+      <div class="grid" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:12px;">
+        <label>Product Name
+          <input id="name" required maxlength="80" placeholder="e.g., Wireless Mouse">
+        </label>
+
+        <label>SKU
+          <input id="sku" required maxlength="30" placeholder="e.g., MSE-100">
+        </label>
+
+        <label>Price
+          <input id="price" type="number" min="0" step="0.01" required placeholder="e.g., 12.99">
+        </label>
+
+        <label>Quantity
+          <input id="quantity" type="number" min="0" step="1" required placeholder="e.g., 10">
+        </label>
+
+        <label>Category
+          <select id="category" required>
+            <option value="">Select a category</option>
+            <option>Electronics</option>
+            <option>Furniture</option>
+            <option>Clothing</option>
+            <option>Food</option>
+            <option>Other</option>
+          </select>
+        </label>
+      </div>
+
+      <div id="error" class="hint" style="display:none; color:#b91c1c; margin:8px 0;"></div>
+      <div id="success" class="hint" style="display:none; color:#166534; margin:8px 0;"></div>
+
+      <div style="display:flex; gap:10px; margin-top:8px; flex-wrap:wrap;">
+        <button type="submit">Save Product</button>
+        <a class="btn" href="products.html" style="background:#6b7280;">Cancel</a>
+      </div>
+    </form>
+  </main>
+
+  <script src="auth.js"></script>
+  <script src="storage.js"></script>
+  <script src="settings.js"></script>
+
+  <script>
+
+    function fillCategories(selectId, selectedValue) {
+    const s = getSettings();
+    const sel = document.getElementById(selectId);
+    sel.innerHTML = '<option value="">Select a category</option>' +
+      (s.categories || []).map(c => `<option ${c===selectedValue?'selected':''}>${c}</option>`).join('');
+  }
+
+    function initAddProduct() {
+    requireAuth();
+    fillCategories('category', '');
+  }
+
+    function showError(msg) {
+      const el = document.getElementById('error');
+      el.textContent = msg;
+      el.style.display = 'block';
+      document.getElementById('success').style.display = 'none';
+    }
+
+    function showSuccess(msg) {
+      const el = document.getElementById('success');
+      el.textContent = msg;
+      el.style.display = 'block';
+      document.getElementById('error').style.display = 'none';
+    }
+
+    function handleSubmit(e) {
+      e.preventDefault();
+
+      const name = document.getElementById('name').value.trim();
+      const sku = document.getElementById('sku').value.trim();
+      const price = Number(document.getElementById('price').value);
+      const quantity = Number(document.getElementById('quantity').value);
+      const category = document.getElementById('category').value;
+
+      // Client-side validation
+      if (!name || !sku || !category) {
+        showError('Please fill in all required fields.');
+        return;
+      }
+      if (!isFinite(price) || price < 0) {
+        showError('Price must be a valid number greater than or equal to 0.');
+        return;
+      }
+      if (!Number.isInteger(quantity) || quantity < 0) {
+        showError('Quantity must be a whole number greater than or equal to 0.');
+        return;
+      }
+
+      const product = {
+        id: Date.now(),
+        name,
+        sku,
+        price,
+        quantity,
+        category,
+        dateAdded: new Date().toISOString().slice(0,10)
+      };
+
+      addProduct(product);
+      showSuccess('Product saved successfully. Redirecting...');
+
+      setTimeout(() => {
+        window.location.href = 'products.html';
+      }, 600);
+    }
+  </script>
+</body>
+<script src="auth.js"></script>
+<script>
+  requireAuth();
+</script>
+<script src="settings.js"></script>
+<script>
+  (function syncTitle(){
+    const s = getSettings();
+    document.title = s.appName + ' • ' + document.title.replace(/.*•\s*/, '');
+  })();
+</script>
+</html>

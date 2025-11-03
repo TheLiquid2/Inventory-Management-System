@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Vendors • IMS</title>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body onload="initVendorsPage()">
+  <header class="topbar">
+    <nav>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="products.html">Products</a>
+      <a href="add-product.html">Add Product</a>
+      <a href="vendors.html" >Vendors</a>
+      <a href="settings.html">Settings</a>
+      <a href="about.html">Help</a>
+    </nav>
+    <button class="btn btn-sm" onclick="logout()">Logout</button>
+  </header>
+
+  <main class="container">
+    <section class="card">
+      <h1 class="mt-0">Vendors</h1>
+      <div class="row gap-10 mt-12">
+        <input id="vendorSearch" placeholder="Search by vendor or contact" oninput="renderVendors()" class="w-full max-320">
+        <div class="flex gap-8" style="margin-left:auto;">
+          <a  href="add-vendor.html">+ New Vendor</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="card mt-12">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Contact</th>
+              <th>Email</th>
+              <th>Phone</th>
+              <th>Address</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="vendorsTbody"></tbody>
+        </table>
+      </div>
+      <p id="vendorsEmpty" class="hint" style="display:none;"></p>
+    </section>
+  </main>
+
+  <script src="auth.js"></script>
+  <script src="storage.js"></script>
+  <script>
+    function initVendorsPage() {
+      requireAuth();
+      renderVendors();
+    }
+    function seedAndReloadVendors() {
+      seedDemoVendors();
+      renderVendors();
+    }
+    function renderVendors() {
+      const term = (document.getElementById('vendorSearch').value || '').toLowerCase();
+      const rows = getVendors().filter(v => {
+        return (
+          (v.name && v.name.toLowerCase().includes(term)) ||
+          (v.contactName && v.contactName.toLowerCase().includes(term)) ||
+          (v.email && v.email.toLowerCase().includes(term))
+        );
+      });
+
+      const tbody = document.getElementById('vendorsTbody');
+      const empty = document.getElementById('vendorsEmpty');
+
+      if (rows.length === 0) {
+        const any = getVendors().length > 0;
+        empty.textContent = any
+          ? 'No results. Try a different search term.'
+          : 'No vendors yet. Click “Seed Demo Vendors” or “+ New Vendor” to get started.';
+        empty.style.display = 'block';
+        tbody.innerHTML = '';
+        return;
+      }
+
+      empty.style.display = 'none';
+      tbody.innerHTML = rows.map(v => `
+        <tr>
+          <td>${escapeHtml(v.name)}</td>
+          <td>${escapeHtml(v.contactName || '')}</td>
+          <td><a href="mailto:${escapeAttr(v.email)}">${escapeHtml(v.email || '')}</a></td>
+          <td>${escapeHtml(v.phone || '')}</td>
+          <td>${escapeHtml(v.address || '')}</td>
+          <td>
+            <a class="btn btn-ghost btn-sm" href="edit-vendor.html?id=${v.id}">Edit</a>
+            <button class="btn btn-ghost btn-sm" onclick="deleteVendorConfirm(${v.id})">Delete</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    // Minimal escaping helpers for safe rendering
+    function escapeHtml(s) {
+      return String(s ?? '')
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+        .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
+    function escapeAttr(s) {
+      return String(s ?? '').replace(/"/g,'&quot;');
+    }
+
+    function deleteVendorConfirm(id) {
+      const v = findVendor(id);
+      const name = v ? v.name : 'this vendor';
+      if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
+      deleteVendor(id);
+      renderVendors();
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Settings • IMS</title>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body onload="initSettings()">
+  <header class="topbar">
+    <nav>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="products.html">Products</a>
+      <a href="add-product.html">Add Product</a>
+      <a href="settings.html" >Settings</a>
+      <a href="about.html">Help</a>
+            <a href="vendors.html" >Vendors</a>
+
+    </nav>
+    <button onclick="logout()">Logout</button>
+  </header>
+
+  <main class="container">
+    <h1>Settings</h1>
+
+    <section class="card" style="margin-top:12px;">
+      <h3 style="margin-top:0;">App Identity</h3>
+      <label>Application Name
+        <input id="appName" placeholder="Inventory Portal" />
+      </label>
+      <div style="margin-top:8px;">
+        <button onclick="saveAppName()">Save App Name</button>
+      </div>
+      <p id="appNameMsg" class="hint" style="display:none; margin-top:8px; color:#166534;">Saved!</p>
+    </section>
+
+    <section class="card" style="margin-top:12px;">
+      <h3 style="margin-top:0;">Inventory Rules</h3>
+      <label>Low-stock threshold (qty ≤ threshold is considered low)
+        <input id="lowStock" type="number" min="0" step="1" />
+      </label>
+      <div style="margin-top:8px;">
+        <button onclick="saveThreshold()">Save Threshold</button>
+      </div>
+      <p id="thresholdMsg" class="hint" style="display:none; margin-top:8px; color:#166534;">Saved!</p>
+    </section>
+
+    <section class="card" style="margin-top:12px;">
+      <h3 style="margin-top:0;">Categories</h3>
+
+      <div id="catList" style="margin-bottom:10px;"></div>
+
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <input id="newCat" placeholder="New category (e.g., Accessories)" />
+        <button onclick="addCategory()">Add Category</button>
+      </div>
+      <p id="catMsg" class="hint" style="display:none; margin-top:8px; color:#166534;">Updated!</p>
+
+    </section>
+  </main>
+
+  <script src="auth.js"></script>
+  <script src="storage.js"></script>
+  <script src="settings.js"></script>
+  <script>
+    function initSettings() {
+      requireAuth();
+      const s = getSettings();
+      document.getElementById('appName').value = s.appName;
+      document.getElementById('lowStock').value = s.lowStockThreshold;
+      renderCategories();
+      document.title = s.appName + ' • Settings';
+    }
+
+    function saveAppName() {
+      const name = document.getElementById('appName').value.trim() || 'Inventory Portal';
+      updateSetting('appName', name);
+      document.getElementById('appNameMsg').style.display = 'block';
+      setTimeout(() => document.getElementById('appNameMsg').style.display = 'none', 1200);
+    }
+
+    function saveThreshold() {
+      const n = Number(document.getElementById('lowStock').value);
+      const val = Number.isInteger(n) && n >= 0 ? n : 5;
+      updateSetting('lowStockThreshold', val);
+      document.getElementById('thresholdMsg').style.display = 'block';
+      setTimeout(() => document.getElementById('thresholdMsg').style.display = 'none', 1200);
+    }
+
+    function renderCategories() {
+      const s = getSettings();
+      const el = document.getElementById('catList');
+      if (!s.categories || s.categories.length === 0) {
+        el.innerHTML = '<p class="hint">No categories yet.</p>';
+        return;
+      }
+      el.innerHTML = s.categories.map(cat => `
+        <div style="display:flex; align-items:center; justify-content:space-between; border:1px solid var(--line); padding:8px 10px; border-radius:8px; margin:6px 0;">
+          <span>${cat}</span>
+          <button onclick="removeCategory('${cat.replace(/'/g, "\\'")}')">Remove</button>
+        </div>
+      `).join('');
+    }
+
+    function addCategory() {
+      const input = document.getElementById('newCat');
+      const name = input.value.trim();
+      if (!name) return;
+      const s = getSettings();
+      if (!s.categories.includes(name)) {
+        s.categories.push(name);
+        saveSettings(s);
+        renderCategories();
+        document.getElementById('catMsg').style.display = 'block';
+        setTimeout(() => document.getElementById('catMsg').style.display = 'none', 1200);
+      }
+      input.value = '';
+    }
+
+    function removeCategory(name) {
+      const s = getSettings();
+      s.categories = s.categories.filter(c => c !== name);
+      saveSettings(s);
+      renderCategories();
+      document.getElementById('catMsg').style.display = 'block';
+      setTimeout(() => document.getElementById('catMsg').style.display = 'none', 1200);
+    }
+  </script>
+</body>
+</html>

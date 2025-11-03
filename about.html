@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>About / Help • ERP Portal</title>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body onload="initAboutPage()">
+  <header class="topbar">
+    <nav>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="products.html">Products</a>
+      <a href="vendors.html">Vendors</a>
+      <a href="settings.html">Settings</a>
+      <a href="reports.html">Reports</a>
+      <a href="po-list.html">POs</a>
+      <a href="about.html" >Help</a>
+    </nav>
+    <button class="btn btn-sm" onclick="logout()">Logout</button>
+  </header>
+
+  <main class="container">
+    <section class="card">
+      <h1 class="mt-0">About / Help</h1>
+      <p class="hint">ERP Portal – Inventory and Vendor Management System</p>
+
+      <h3>Overview</h3>
+      <p>
+        This ERP web application was developed as part of an internship project to manage core business entities such as
+        products, vendors, and purchase orders. Data is stored locally
+        in your browser using localStorage, and no external server is required. The goal is to simulate essential ERP
+        functionalities while maintaining a lightweight and portable design.
+      </p>
+
+     
+
+      <h3>Data Management Tools</h3>
+      <p class="hint">You can quickly reset the app to start fresh.</p>
+      <div class="row mt-12">
+        <button class="btn btn-ghost btn-sm" onclick="resetAllData()">Reset All Data</button>
+      </div>
+      <p class="hint mt-8">Resetting data clears all local records (products, vendors, purchase orders, and settings).</p>
+
+    
+
+      <h3>Project Details</h3>
+      <p>
+        This system is a well project structure, coding practices, and UI design. It was  developed during the 
+        internship to cover HTML, CSS, and JavaScript concepts, backend, database design and integration, master data handling, CRUD operations, and transactional workflows like Purchase Orders.
+      </p>
+    </section>
+  </main>
+
+ 
+  <script src="auth.js"></script>
+  <script src="storage.js"></script>
+  <script>
+    function initAboutPage() {
+      requireAuth();
+    }
+
+    function seedDemoAll() {
+      if (!confirm('This will add demo data sets for Products, Vendors, and POs. Continue?')) return;
+      try {
+        seedDemoProducts && seedDemoProducts();
+        seedDemoVendors && seedDemoVendors();
+        seedDemoPOs && seedDemoPOs();
+        alert('Demo data added successfully!');
+      } catch (e) {
+        console.error(e);
+        alert('An error occurred while seeding demo data.');
+      }
+    }
+
+    function resetAllData() {
+      if (!confirm('This will delete all products, vendors, POs, and settings stored locally. Continue?')) return;
+      localStorage.removeItem('ims_products');
+      localStorage.removeItem('ims_vendors');
+      localStorage.removeItem('ims_pos');
+      localStorage.removeItem('ims_po_lines');
+      localStorage.removeItem('ims_settings');
+      alert('All data cleared successfully. The system will reload.');
+      location.reload();
+    }
+  </script>
+</body>
+</html>

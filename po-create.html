@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Create PO • IMS</title>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body onload="initPOCreate()">
+  <header class="topbar">
+    <nav>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="products.html">Products</a>
+      <a href="vendors.html">Vendors</a>
+      <a href="settings.html">Settings</a>
+      <a href="po-list.html">Product Orders</a>
+      <a href="about.html">Help</a>
+    </nav>
+    <button class="btn btn-sm" onclick="logout()">Logout</button>
+  </header>
+
+  <main class="container">
+    <section class="card">
+      <h1 class="mt-0">Create Purchase Order</h1>
+      <p id="formError" class="alert-error" style="display:none;" aria-live="assertive"></p>
+
+      <form onsubmit="return handleSavePO(event)">
+        <div class="grid">
+          <div class="field">
+            <label>Vendor</label>
+            <select id="vendorId" required></select>
+          </div>
+          <div class="field">
+            <label>Order Date</label>
+            <input id="date" type="date" required>
+          </div>
+          <div class="field" style="grid-column:1/-1;">
+            <label>Notes</label>
+            <input id="notes" placeholder="Optional notes">
+          </div>
+        </div>
+
+        <h3 class="mt-16">Line Items</h3>
+        <div id="lines"></div>
+        <button type="button" class="btn btn-ghost btn-sm mt-12" onclick="addLine()">+ Add Line</button>
+
+        <div class="row mt-16" style="justify-content:flex-end;">
+          <strong>Total:</strong>
+          <span id="poTotal" style="margin-left:8px;">$0.00</span>
+        </div>
+
+        <div class="row mt-16">
+          <button class="btn">Save as Draft</button>
+          <a class="btn btn-ghost" href="po-list.html">Cancel</a>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <script src="auth.js"></script>
+  <script src="storage.js"></script>
+  <script src="utils.js"></script>
+  <script>
+    let lineIdx = 0;
+    function initPOCreate() {
+      requireAuth();
+      fillVendors();
+      addLine(); // start with one line
+      document.getElementById('date').value = new Date().toISOString().slice(0,10);
+    }
+
+    function fillVendors() {
+      const sel = document.getElementById('vendorId');
+      const vendors = getVendors();
+      if (!vendors.length) {
+        alert('No vendors found. Please add a vendor first.');
+        location.href = 'vendors.html';
+        return;
+      }
+      sel.innerHTML = vendors.map(v => `<option value="${v.id}">${escapeHtml(v.name)}</option>`).join('');
+    }
+
+    function addLine() {
+      const wrap = document.getElementById('lines');
+      const idx = lineIdx++;
+      const products = getProducts();
+      const prodOptions = products.map(p => `<option value="${p.id}" data-price="${p.price}">${escapeHtml(p.name)}</option>`).join('');
+      const block = document.createElement('div');
+      block.className = 'card mt-12';
+      block.innerHTML = `
+        <div class="grid">
+          <div class="field">
+            <label>Product</label>
+            <select id="p_${idx}" onchange="syncPrice(${idx})">${prodOptions}</select>
+          </div>
+          <div class="field">
+            <label>Qty</label>
+            <input id="q_${idx}" type="number" min="1" step="1" value="1" oninput="recalcTotal()">
+          </div>
+          <div class="field">
+            <label>Unit Price</label>
+            <input id="u_${idx}" type="number" min="0" step="0.01" value="0" oninput="recalcTotal()">
+          </div>
+        </div>
+        <div class="row mt-12">
+          <button type="button" class="btn btn-ghost btn-sm" onclick="removeLine(this)">Remove</button>
+        </div>
+      `;
+      wrap.appendChild(block);
+      syncPrice(idx);
+      recalcTotal();
+    }
+
+    function removeLine(btn) {
+      btn.closest('.card').remove();
+      recalcTotal();
+    }
+
+    function syncPrice(idx) {
+      const sel = document.getElementById('p_' + idx);
+      const opt = sel.options[sel.selectedIndex];
+      const price = Number(opt.getAttribute('data-price')) || 0;
+      const unit = document.getElementById('u_' + idx);
+      if (!unit || unit.value === '0' || unit.value === '' ) {
+        unit.value = price.toFixed(2);
+      }
+      recalcTotal();
+    }
+
+    function recalcTotal() {
+      const wraps = document.querySelectorAll('#lines .card');
+      let total = 0;
+      wraps.forEach(card => {
+        const sel = card.querySelector('select');
+        const qty = Number(card.querySelector('input[id^="q_"]').value) || 0;
+        const unit = Number(card.querySelector('input[id^="u_"]').value) || 0;
+        total += qty * unit;
+      });
+      document.getElementById('poTotal').textContent = formatCurrency(total);
+    }
+
+    function handleSavePO(e) {
+      e.preventDefault();
+      const vendorId = Number(document.getElementById('vendorId').value);
+      const date = document.getElementById('date').value;
+      const notes = document.getElementById('notes').value.trim();
+
+      const lineCards = document.querySelectorAll('#lines .card');
+      if (lineCards.length === 0) return showError('Add at least one line.');
+      const lines = [];
+      for (const card of lineCards) {
+        const productId = Number(card.querySelector('select').value);
+        const qty = Number(card.querySelector('input[id^="q_"]').value);
+        const unitPrice = Number(card.querySelector('input[id^="u_"]').value);
+        if (!productId) return showError('Each line must have a product.');
+        if (!qty || qty < 1) return showError('Quantity must be at least 1.');
+        if (unitPrice < 0) return showError('Unit price cannot be negative.');
+        lines.push({ productId, qty, unitPrice });
+      }
+
+      const id = addPO({ vendorId, date, status: 'Draft', notes }, lines);
+      location.href = 'po-list.html';
+      return false;
+    }
+
+    function showError(msg) {
+      const el = document.getElementById('formError');
+      el.textContent = msg;
+      el.style.display = 'block';
+      setTimeout(() => el.style.display = 'none', 2000);
+    }
+
+    function escapeHtml(s) {
+      return String(s ?? '')
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+        .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
+  </script>
+</body>
+</html>

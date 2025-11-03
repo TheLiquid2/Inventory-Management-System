@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Add Vendor • IMS</title>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body onload="initAddVendor()">
+  <header class="topbar">
+    <nav>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="products.html">Products</a>
+      <a href="add-product.html">Add Product</a>
+      <a href="vendors.html" class="active">Vendors</a>
+      <a href="settings.html">Settings</a>
+      <a href="about.html">Help</a>
+    </nav>
+    <button class="btn btn-sm" onclick="logout()">Logout</button>
+  </header>
+
+  <main class="container">
+    <section class="card">
+      <h1 class="mt-0">Add Vendor</h1>
+      <p id="formError" class="alert-error" style="display:none;" aria-live="assertive"></p>
+
+      <form onsubmit="return handleSubmit(event)">
+        <div class="grid">
+          <div class="field">
+            <label>Vendor Name</label>
+            <input id="name" required>
+          </div>
+          <div class="field">
+            <label>Contact Person</label>
+            <input id="contactName">
+          </div>
+          <div class="field">
+            <label>Email</label>
+            <input id="email" type="email" placeholder="name@company.com">
+          </div>
+          <div class="field">
+            <label>Phone</label>
+            <input id="phone" placeholder="+1 555-1234">
+          </div>
+          <div class="field" style="grid-column: 1/-1;">
+            <label>Address</label>
+            <input id="address" placeholder="Street, City, State">
+          </div>
+        </div>
+
+        <div class="row mt-12">
+          <button class="btn">Save Vendor</button>
+          <a class="btn btn-ghost" href="vendors.html">Cancel</a>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <script src="auth.js"></script>
+  <script src="storage.js"></script>
+  <script>
+    function initAddVendor() {
+      requireAuth();
+    }
+    function handleSubmit(e) {
+      e.preventDefault();
+      const data = {
+        name: document.getElementById('name').value.trim(),
+        contactName: document.getElementById('contactName').value.trim(),
+        email: document.getElementById('email').value.trim(),
+        phone: document.getElementById('phone').value.trim(),
+        address: document.getElementById('address').value.trim()
+      };
+
+      if (!data.name) {
+        showError('Vendor name is required.');
+        return false;
+      }
+      if (data.email && !/^\S+@\S+\.\S+$/.test(data.email)) {
+        showError('Please enter a valid email address.');
+        return false;
+      }
+
+      addVendor(data);
+      location.href = 'vendors.html';
+      return false;
+    }
+    function showError(msg) {
+      const el = document.getElementById('formError');
+      el.textContent = msg;
+      el.style.display = 'block';
+      setTimeout(() => el.style.display = 'none', 2000);
+    }
+  </script>
+</body>
+</html>

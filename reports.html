@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Reports • IMS</title>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body onload="initReports()">
+  <header class="topbar">
+    <nav>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="products.html">Products</a>
+      <a href="add-product.html">Add Product</a>
+      <a href="settings.html">Settings</a>
+      <a href="reports.html" class="active">Reports</a>
+      <a href="about.html">Help</a>
+    </nav>
+    <button class="btn btn-sm" onclick="logout()">Logout</button>
+  </header>
+
+  <main class="container">
+    <section class="card">
+      <h1 class="mt-0">Category Summary</h1>
+      <p class="hint">Aggregated KPIs per category, using your Settings for categories and low-stock threshold.</p>
+
+      <div class="row mt-12">
+        <button class="btn" onclick="exportCategoryCSV()">Export CSV</button>
+        <a  href="settings.html">Manage Categories</a>
+      </div>
+    </section>
+
+    <section class="card mt-12">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Category</th>
+              <th>Products</th>
+              <th>Total Qty</th>
+              <th>Inventory Value</th>
+              <th>Low Stock (≤ threshold)</th>
+              <th>Outliers</th>
+            </tr>
+          </thead>
+          <tbody id="catBody"></tbody>
+        </table>
+      </div>
+      <p id="catEmpty" class="hint" style="display:none;"></p>
+    </section>
+
+    <section class="card mt-12">
+      <h3 class="mt-0"> Reassign Category</h3>
+      <p class="hint">Move all products from one category to another (useful when renaming/merging categories).</p>
+      <div class="row mt-12">
+        <select id="fromCat" class="max-280"></select>
+        <span>→</span>
+        <select id="toCat" class="max-280"></select>
+        <button class="btn btn-sm" onclick="bulkReassign()">Reassign</button>
+      </div>
+      <p id="bulkMsg" class="hint" style="display:none;" aria-live="polite">Reassignment done.</p>
+    </section>
+  </main>
+
+  <script src="auth.js"></script>
+  <script src="storage.js"></script>
+  <script src="settings.js"></script>
+  <script src="utils.js"></script>
+  <script>
+    function initReports() {
+      requireAuth();
+      renderCategorySummary();
+      fillBulkSelects();
+    }
+
+    function renderCategorySummary() {
+      const products = getProducts();
+      const s = getSettings();
+      const low = Number(s.lowStockThreshold) ?? 5;
+
+      const grouped = groupByCategory(products, s.categories);
+      const tbody = document.getElementById('catBody');
+      const empty = document.getElementById('catEmpty');
+
+      const cats = Object.keys(grouped);
+      if (cats.length === 0) {
+        empty.textContent = 'No products to summarize.';
+        empty.style.display = 'block';
+        tbody.innerHTML = '';
+        return;
+      }
+      empty.style.display = 'none';
+
+      tbody.innerHTML = cats.sort().map(cat => {
+        const g = grouped[cat];
+        const lowCount = g.items.filter(p => Number(p.quantity) <= low).length;
+
+        // If this category isn't in Settings, mark as outlier usage
+        const outlier = (getSettings().categories || []).includes(cat) ? 0 : g.count;
+
+        return `
+          <tr>
+            <td>${escapeHtml(cat)}</td>
+            <td>${g.count}</td>
+            <td>${g.qty}</td>
+            <td>${formatCurrency(g.value)}</td>
+            <td>${lowCount}</td>
+            <td>${outlier}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function exportCategoryCSV() {
+      const s = getSettings();
+      const grouped = groupByCategory(getProducts(), s.categories);
+      const rows = toCategorySummaryRows(grouped);
+      const csv = toCSV(rows);
+      const name = 'category_summary_' + new Date().toISOString().slice(0,10) + '.csv';
+      downloadFile(name, csv, 'text/csv');
+    }
+
+    function fillBulkSelects() {
+      const s = getSettings();
+      const cats = s.categories || [];
+      const from = document.getElementById('fromCat');
+      const to = document.getElementById('toCat');
+      const opts = cats.map(c => `<option>${c}</option>`).join('');
+      from.innerHTML = '<option value="">From category…</option>' + opts;
+      to.innerHTML   = '<option value="">To category…</option>'   + opts;
+    }
+
+    function bulkReassign() {
+      const from = document.getElementById('fromCat').value;
+      const to = document.getElementById('toCat').value;
+      if (!from || !to) { alert('Please select both categories.'); return; }
+      if (from === to) { alert('Choose two different categories.'); return; }
+
+      const list = getProducts();
+      let changed = 0;
+      const now = new Date().toISOString();
+      const next = list.map(p => {
+        if ((p.category || 'Other') === from) {
+          changed++;
+          return { ...p, category: to, updatedAt: now };
+        }
+        return p;
+      });
+      saveProducts(next);
+
+      document.getElementById('bulkMsg').style.display = 'block';
+      setTimeout(() => document.getElementById('bulkMsg').style.display = 'none', 1500);
+
+      renderCategorySummary();
+      alert(`Reassigned ${changed} product(s) from "${from}" to "${to}".`);
+    }
+
+    function escapeHtml(s) {
+      return String(s ?? '')
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+        .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
+  </script>
+</body>
+</html>

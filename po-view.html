@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>PO • IMS</title>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body onload="initPOView()">
+  <header class="topbar">
+    <nav>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="products.html">Products</a>
+      <a href="vendors.html">Vendors</a>
+      <a href="po-list.html">POs</a>
+      <a href="about.html">Help</a>
+    </nav>
+    <button class="btn btn-sm" onclick="logout()">Logout</button>
+  </header>
+
+  <main class="container">
+    <section class="card">
+      <h1 class="mt-0">Purchase Order <span id="poId"></span></h1>
+      <p class="hint" id="meta"></p>
+
+      <div class="grid mt-12">
+        <div><strong>Vendor:</strong> <span id="vendor"></span></div>
+        <div><strong>Date:</strong> <span id="date"></span></div>
+        <div style="grid-column:1/-1;"><strong>Notes:</strong> <span id="notes"></span></div>
+      </div>
+
+      <h3 class="mt-16">Line Items</h3>
+      <div class="table-wrap mt-12">
+        <table>
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th>Qty</th>
+              <th>Unit Price</th>
+              <th>Line Total</th>
+            </tr>
+          </thead>
+          <tbody id="lineBody"></tbody>
+          <tfoot>
+            <tr>
+              <td colspan="3" style="text-align:right;"><strong>Total</strong></td>
+              <td id="sumTotal"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <div class="row mt-16">
+  <button id="receiveBtn" class="btn btn-sm" onclick="receivePO()">Mark as Received</button>
+  <a href="po-list.html" class="btn btn-ghost btn-sm">Back to List</a>
+</div>
+    </section>
+  </main>
+
+  <script src="auth.js"></script>
+  <script src="storage.js"></script>
+  <script src="utils.js"></script>
+  <script>
+    function initPOView() {
+      requireAuth();
+      const id = Number(new URLSearchParams(location.search).get('id'));
+      const po = findPO(id);
+      if (!po) { alert('PO not found.'); location.href = 'po-list.html'; return; }
+      document.getElementById('poId').textContent = '#' + id;
+      document.getElementById('meta').textContent = `Status: ${po.status} • Created: ${formatDateTime(po.createdAt)} • Updated: ${formatDateTime(po.updatedAt)}`;
+      document.getElementById('vendor').textContent = po.vendorName || '—';
+      document.getElementById('date').textContent = formatDate(po.date);
+      document.getElementById('notes').textContent = po.notes || '—';
+
+      const lines = getLinesForPO(id);
+      const body = document.getElementById('lineBody');
+      body.innerHTML = lines.map(l => `
+        <tr>
+          <td>${escapeHtml(l.productName)}</td>
+          <td>${l.qty}</td>
+          <td>${formatCurrency(l.unitPrice)}</td>
+          <td>${formatCurrency(l.lineTotal)}</td>
+        </tr>
+      `).join('');
+      document.getElementById('sumTotal').textContent = formatCurrency(po.total);
+    }
+
+    function formatDate(iso) {
+      if (!iso) return '—';
+      try { return new Date(iso).toLocaleDateString(); } catch { return '—'; }
+    }
+    function formatDateTime(iso) {
+      if (!iso) return '—';
+      try { return new Date(iso).toLocaleString(); } catch { return '—'; }
+    }
+    function escapeHtml(s) {
+      return String(s ?? '')
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+        .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
+
+    function receivePO() {
+  const id = Number(new URLSearchParams(location.search).get('id'));
+  const po = findPO(id);
+  if (!po) return alert('PO not found.');
+  if (po.status === 'Received') 
+    return alert('This PO has already been received.');
+
+  if (!confirm(`Mark PO #${id} as received and update product quantities?`)) return;
+
+  const lines = getLinesForPO(id);
+  const products = getProducts();
+
+  lines.forEach(line => {
+    const p = products.find(p => p.id === line.productId);
+    if (p) {
+      p.quantity = (p.quantity || 0) + line.qty;
+      p.updatedAt = new Date().toISOString();
+    }
+  });
+
+  saveProducts(products);
+  po.status = 'Received';
+  po.updatedAt = new Date().toISOString();
+  updatePO(po);
+
+  addLog(`PO #${id} received from ${po.vendorName}. Stock updated for ${lines.length} products.`);
+
+  alert('PO received successfully. Product stocks updated.');
+  location.href = 'po-list.html';
+}
+  </script>
+</body>
+</html>
