@@ -1,10 +1,11 @@
 # Inventory Management System
 Description:
+
 An inventory management system developed during my software engineering internship.
 The project focuses on managing inventory data through a backend built with Node.js
 and database integration.
 
-what Technologies that are used and gained during my internship:
+What Technologies that are used and gained during my internship:
 - Node.js
 - JavaScript
 - Database
